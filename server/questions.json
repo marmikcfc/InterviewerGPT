@@ -1,0 +1,35 @@
+{
+    "coding": [
+        {
+            "question": "Given a string, find the length of the longest substring without repeating characters.",
+            "explaination": "Input: 'abcabcbb' Output: 3 Explanation: The answer is \"abc\", with the length of 3."
+        },
+        {
+            "question": "Given a string s containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid. An input string is valid if: \n Open brackets must be closed by the same type of brackets. \n Open brackets must be closed in the correct order. \n Every close bracket has a corresponding open bracket of the same type",
+            "explaination": "Example 1:\nInput: s = \"()\" \nOutput: true\nExample 2:\nInput: s = \"()[]{}\" \nOutput: true\nExample 3:\nInput: s = \"(]\" \nOutput: false\n"
+        },
+        {
+            "question": "You are given an array of integers nums, there is a sliding window of size k which is moving from the very left of the array to the very right. You can only see the k numbers in the window. Each time the sliding window moves right by one position. Return the max sliding window.",
+            "explaination": "Example 1:\n\nInput: nums = [1,3,-1,-3,5,3,6,7], k = 3\nOutput: [3,3,5,5,6,7]\nExplanation:\nWindow position                Max\n---------------               -----\n[1  3  -1] -3  5  3  6  7       3\n 1 [3  -1  -3] 5  3  6  7       3\n 1  3 [-1  -3  5] 3  6  7       5\n 1  3  -1 [-3  5  3] 6  7       5\n 1  3  -1  -3 [5  3  6] 7       6\n 1  3  -1  -3  5 [3  6  7]      7\n\nExample 2:\n\nInput: nums = [1], k = 1\nOutput: [1]\n\nConstraints:\n\n1 <= nums.length <= 105\n-104 <= nums[i] <= 104\n1 <= k <= nums.length"
+        },
+        {
+            "question": "Find pairs of values that sum up to a given value",
+            "explaination": "Example 1\nInput: nums = [5, 2, 3], target = 8\nOutput: [0, 2]\n\nExample 2\nInput: nums = [3, 2, 4], target = 6\nOutput: [1, 2]\n\nExample 3\nInput: nums = [5, 5], target = 10\nOutput: [0, 1]"
+        },
+        {
+            "question": "Find the kth largest element in an unsorted array",
+            "explaination": "\nExample 1:\nInput: nums = [3,2,1,5,6,4], k = 2\nOutput: 5 (The 2nd largest element in the array is 5)\n\nExample 2:\nInput: nums = [3,2,3,1,2,4,5,5,6], k = 4\nOutput: 4 (The 4th largest element in the array is 4)"
+        },
+        {
+            "question": "Given a list of tuples that represent (X, Y) coordinates on an XY plane and an integer K, return a list of the K-closest points to the origin (0, 0).",
+            "explaination": "Example 1\nInput:\npoints = [[5, 5], [3, 3], [4, 4]], k = 2\nOutput:\n[[3, 3], [4, 4]] or [[4, 4], [3, 3]]"
+        }
+    ],
+    "system_design": [
+        "Design a recommender system like youtube",
+        "Design a ride-sharing service",
+        "Design a URL shortening service (like bit.ly).",
+        "Design a scalable photo sharing system (like instagram).",
+        "Design a distributed cache system"
+    ]
+}
