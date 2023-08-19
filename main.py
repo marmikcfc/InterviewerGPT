@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
 from langchain.vectorstores import VectorStore
-from callback import QuestionGenCallbackHandler, StreamingLLMCallbackHandler
+from callback import StreamingLLMCallbackHandler
 from datetime import datetime
 import random
 import os
@@ -14,28 +14,6 @@ from schema import ChatResponse
 from chains import get_chain
 from langchain.prompts.prompt import PromptTemplate
 
-
-'''
-Interviewing is painful process and it takes a lot of bandwidth. So ideally, app should
-1. have an agent to take interview
-2. Upload the transcript in transcripts section
-3. Transcript should be summarised and searchable for human recuriter
-4. Provide feedback to the user pretty quickly
-
----
-P0 -> Set up websockets over fastapi
-P1 -> Set up chains, streaming, intro to interview agent
-P2 -> Set up output parser to collect words from a stream of tokens
-P3 -> Set up other agents to carry out coding interview 
-P4 -> React frontend with editor and react chat window
-P5 -> Add openAI Whisper for the Speech to text
-P6 -> Add elevenlabs for text to speech and direct audio transfer over websocklets
-P7 -> Store transcripts in vector store for semantic search
-P8 -> View transcripts on a dashboard
-P9 -> System design interview
-P10 -> Mermaidjs integration for the system design interview
-P11 -> Behavioural interview
-'''
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -105,7 +83,6 @@ async def get(request: Request):
 @app.websocket("/chat")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    question_handler = QuestionGenCallbackHandler(websocket)
     stream_handler = StreamingLLMCallbackHandler(websocket)
     chat_history = []
     #TODO: Tracing true isn't working, resolve that
@@ -142,7 +119,8 @@ async def websocket_endpoint(websocket: WebSocket):
             else:
                 result = await interview_chain.acall({"input": request["msg"]})
                 chat_history.append((request["msg"], result["response"]))
-            
+            # Flush out remaining tokens in the buffer
+            await stream_handler.flush_buffer() 
             end_resp = ChatResponse(sender="interviewer", message="", type="end")
             await websocket.send_json(end_resp.dict())
 
@@ -153,12 +131,12 @@ async def websocket_endpoint(websocket: WebSocket):
             break
         except Exception as e:
             logging.error(e)
-            # resp = ChatResponse(
-            #     sender="bot",
-            #     message="Sorry, something went wrong. Try again.",
-            #     type="error",
-            # )
-            await websocket.send_json({"msg": "Sorry something went wrong"})
+            resp = ChatResponse(
+                sender="interviewer",
+                message="Sorry, something went wrong. Try again.",
+                type="error",
+            )
+            await websocket.send_json(resp.dict())
 
 
 if __name__ == "__main__":
