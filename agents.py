@@ -1,17 +1,34 @@
 from pydantic import Field
-from langchain import Agent, OpenAI, ConversationChain, AgentOutputParser, ConversationBufferMemory
+from langchain.chains import ConversationChain
+from langchain.agents import Agent, AgentOutputParser
+from collections import defaultdict
+from interview_sections import InterviewSections
 
-class ConversationalAgent(Agent):
+class InterviewAgent():
     """A conversational agent that uses the ConversationChain for interactions and maintains chat history."""
-    
-    llm_chain: ConversationChain = Field(default_factory=lambda: ConversationChain(llm=OpenAI()))
-    output_parser: AgentOutputParser = Field(default_factory=AgentOutputParser)
-    memory: ConversationBufferMemory = Field(default_factory=ConversationBufferMemory)
-
-    def __init__(self, **data):
-        super().__init__(**data)
+    def __init__(self):
         # Set the memory for the ConversationChain
-        self.llm_chain.memory = self.memory
+        self.current_chain_id = InterviewSections.CODING_INTERVIEW_INTRO
+        self.chain_id_dict = defaultdict(ConversationChain)
+    
+    def add_chain(self, chain_id, chain) -> bool:
+        self.chain_id_dict[chain_id] = chain
+        return True
+    
+    def get_current_chain(self) -> ConversationChain:
+        return self.chain_id_dict[self.current_chain_id]
+
+    def set_current_chain(self, chain_id: InterviewSections) -> bool:
+        if chain_id in self.chain_id_dict:
+            self.current_chain_id = chain_id
+            return True
+        return False
+    
+
+    def get_chain(self, chain_id: int) -> ConversationChain:
+        if chain_id in self.chain_id_dict:
+            return self.chain_id_dict[chain_id]
+
 
     def interact(self, message: str) -> str:
         """
@@ -23,26 +40,5 @@ class ConversationalAgent(Agent):
         Returns:
         - str: The agent's response.
         """
-        response = self.llm_chain(message)
+        response = self.get_current_chain(message)
         return response
-
-    def get_chat_history(self) -> list:
-        """
-        Retrieve the chat history from the agent's memory.
-
-        Returns:
-        - list: The chat history.
-        """
-        return self.memory.get_history()
-
-# Example usage:
-agent = ConversationalAgent()
-response1 = agent.interact("Hello, how are you?")
-print(response1)
-
-response2 = agent.interact("Tell me more about yourself.")
-print(response2)
-
-# Retrieve chat history
-history = agent.get_chat_history()
-print(history)

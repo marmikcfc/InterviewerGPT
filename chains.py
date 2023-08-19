@@ -5,10 +5,10 @@ from langchain.chains import ConversationChain
 from langchain.chains.llm import LLMChain
 from langchain.chains.question_answering import load_qa_chain
 from langchain.llms import OpenAI
-from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
+from interview_sections import InterviewSections 
 
-def get_chain(stream_handler, prompt, tracing: bool = False) -> ConversationChain:
+def get_chain(interview_section, stream_handler, prompt, tracing: bool = False) -> ConversationChain:
     """Create a converstion introduction chain for question/answering."""
     manager = AsyncCallbackManager([])
     #question_manager = AsyncCallbackManager([question_handler])
@@ -29,11 +29,14 @@ def get_chain(stream_handler, prompt, tracing: bool = False) -> ConversationChai
 
     print("creating chain")
 
-    conversation_chain = ConversationChain(
-        prompt = prompt,
-        llm=streaming_llm, 
-        verbose=True, 
-        memory=ConversationBufferMemory()
+    if interview_section == InterviewSections.CODING_INTERVIEW_INTRO:
+        conversation_chain = ConversationChain(
+            prompt = prompt,
+            llm=streaming_llm, 
+            verbose=True, 
+            memory=ConversationBufferMemory()
         )
+    else:
+        return None
 
     return conversation_chain

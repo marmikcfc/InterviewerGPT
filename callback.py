@@ -31,5 +31,6 @@ class StreamingLLMCallbackHandler(AsyncCallbackHandler):
         words = self.token_buffer.split()
         message_to_send = " ".join(words)
         resp = ChatResponse(sender="interviewer", message=message_to_send, type="stream")
+        self.token_buffer = ""
         await self.websocket.send_json(resp.dict())
     

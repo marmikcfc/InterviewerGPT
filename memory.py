@@ -1,3 +1,4 @@
+""" Created by gpt 4. So, be careful before using it. """
 from weaviate import Client
 
 class WeaviateMemory:
