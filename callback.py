@@ -1,6 +1,6 @@
-"""Callback handlers used in the app."""
 from typing import Any, Dict, List
 from langchain.callbacks.base import AsyncCallbackHandler
+from schema import ChatResponse
 
 class StreamingLLMCallbackHandler(AsyncCallbackHandler):
     """Callback handler for streaming LLM responses."""
@@ -9,7 +9,7 @@ class StreamingLLMCallbackHandler(AsyncCallbackHandler):
         self.websocket = websocket
 
     async def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
-        resp = ChatResponse(sender="bot", message=token, type="stream")
+        resp = ChatResponse(sender="interviewer", message=token, type="stream")
         await self.websocket.send_json(resp.dict())
 
 
@@ -24,6 +24,6 @@ class QuestionGenCallbackHandler(AsyncCallbackHandler):
     ) -> None:
         """Run when LLM starts running."""
         resp = ChatResponse(
-            sender="bot", message="Synthesizing question...", type="info"
+            sender="interviewer", message="Synthesizing question...", type="info"
         )
         await self.websocket.send_json(resp.dict())

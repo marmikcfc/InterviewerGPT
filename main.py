@@ -9,13 +9,40 @@ from langchain.vectorstores import VectorStore
 from callback import QuestionGenCallbackHandler, StreamingLLMCallbackHandler
 from datetime import datetime
 import random
+import os
+from schema import ChatResponse
+from chains import get_chain
+from langchain.prompts.prompt import PromptTemplate
+
+
+'''
+Interviewing is painful process and it takes a lot of bandwidth. So ideally, app should
+1. have an agent to take interview
+2. Upload the transcript in transcripts section
+3. Transcript should be summarised and searchable for human recuriter
+4. Provide feedback to the user pretty quickly
+
+---
+P0 -> Set up websockets over fastapi
+P1 -> Set up chains, streaming, intro to interview agent
+P2 -> Set up output parser to collect words from a stream of tokens
+P3 -> Set up other agents to carry out coding interview 
+P4 -> React frontend with editor and react chat window
+P5 -> Add openAI Whisper for the Speech to text
+P6 -> Add elevenlabs for text to speech and direct audio transfer over websocklets
+P7 -> Store transcripts in vector store for semantic search
+P8 -> View transcripts on a dashboard
+P9 -> System design interview
+P10 -> Mermaidjs integration for the system design interview
+P11 -> Behavioural interview
+'''
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
-vectorstore: Optional[VectorStore] = None
-
+#os.environ["OPENAI_API_KEY"] = ""
 
 interview_dict = {}
+chat_history = []
 
 
 def get_questions ():
@@ -29,13 +56,18 @@ def get_questions ():
     else:
         return "two sum"
 
-def get_prompts(current_agent, chat_history, current_message):
+def get_prompts(current_agent):
     if current_agent == 0:
-        return """ Begin an interactive roleplay as a REAL WORLD technical interviewer. Have initial greeting and ice breaker conversation with the candidate. If required get to know about their background.
-
+        template = """Begin an interactive roleplay as a REAL WORLD technical interviewer. Have initial greeting and ice breaker conversation with the candidate. If required get to know about their background.
                     Interviewer name: Gilfoyle
                     Company name: Piedpier - World's leading compression tech company with huge enterprise customers like Hooli.
-               """
+
+            Current conversation:
+            {history}
+            Human: {input}
+            AI Assistant:"""
+        return PromptTemplate(input_variables=["history", "input"], template=template)
+
     else:
         return "no prompt"
 
@@ -45,8 +77,8 @@ def get_agent(start_time):
 
     diff = (current_time - start_time).total_seconds() / 60
 
-
-    if diff < 1 :
+    # Prompt for intro 
+    if diff < 5 :
         return 0
     elif diff > 1 and diff < 15:
         return 1
@@ -68,16 +100,16 @@ async def get(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+
+
 @app.websocket("/chat")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     question_handler = QuestionGenCallbackHandler(websocket)
     stream_handler = StreamingLLMCallbackHandler(websocket)
     chat_history = []
-    #qa_chain = get_chain(vectorstore, question_handler, stream_handler)
-    # Use the below line instead of the above line to enable tracing
-    # Ensure `langchain-server` is running
-    # qa_chain = get_chain(vectorstore, question_handler, stream_handler, tracing=True)
+    #TODO: Tracing true isn't working, resolve that
+    interview_chain = None
 
     while True:
         try:
@@ -91,9 +123,29 @@ async def websocket_endpoint(websocket: WebSocket):
             print(f"interview dict {interview_dict}")
             current_agent =  get_agent(interview_dict[interview_id]["start_time"])
             print(f"current agent {current_agent}")
-    
-           
-            await websocket.send_json({"msg": f"current_agent {current_agent}"})
+
+            prompt_template = get_prompts(current_agent)
+            if interview_chain is None:
+                print("Interview chain is None and hence, creating it")
+                interview_chain = get_chain(stream_handler, prompt_template , tracing=False)
+
+            # Construct a response
+            start_resp = ChatResponse(sender="interviewer", message="", type="start")
+            await websocket.send_json(start_resp.dict())
+
+            # Start the interview
+            if request["msg"] == "START_INTERVIEW":
+                print("starting interview")
+                result = await interview_chain.acall({"input": "Hi there!"})
+                print(f"answer {result}")
+                chat_history.append((request["msg"], result["response"]))
+            else:
+                result = await interview_chain.acall({"input": request["msg"]})
+                chat_history.append((request["msg"], result["response"]))
+            
+            end_resp = ChatResponse(sender="interviewer", message="", type="end")
+            await websocket.send_json(end_resp.dict())
+
 
             
         except WebSocketDisconnect:
