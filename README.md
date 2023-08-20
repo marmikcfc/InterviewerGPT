@@ -17,10 +17,11 @@ Interviewing is painful process and it takes a lot of engineering bandwidth, the
 - [X] Set up other agents to carry out a full coding interview
 - [X] Add deepgram for the Speech to text
 - [X] Add elevenlabs for text to speech and direct audio transfer over websocklets
-- [.] Store transcripts in vector store for semantic search
-- [.] View transcripts on a dashboard
-- [.] System design interview
-- [.] Mermaidjs integration for the system design interview
-- [.] Behavioural interview
-- [.] ATS integration
-- [.] Calendly integration
+- [ ] Create a seperate class for chains for cleaner update to prompt templates
+- [ ] Store transcripts in vector store for semantic search
+- [ ] View transcripts on a dashboard
+- [ ] System design interview
+- [ ] Mermaidjs integration for the system design interview
+- [ ] Behavioural interview
+- [ ] ATS integration
+- [ ] Calendly integration
