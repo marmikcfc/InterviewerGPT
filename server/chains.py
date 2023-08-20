@@ -17,9 +17,7 @@ from langchain.chains import SimpleSequentialChain
 from langchain.chains.constitutional_ai.models import ConstitutionalPrinciple
 
 def get_chain(interview_section, stream_handler, prompt, tracing: bool = False) -> ConversationChain:
-    """Create a converstion introduction chain for question/answering."""
     manager = AsyncCallbackManager([])
-    #question_manager = AsyncCallbackManager([question_handler])
     stream_manager = AsyncCallbackManager([stream_handler])
     if tracing:
         tracer = LangChainTracer()
@@ -32,8 +30,8 @@ def get_chain(interview_section, stream_handler, prompt, tracing: bool = False) 
         streaming=True,
         callback_manager=stream_manager,
         verbose=True,
-        temperature=1,
-        model = "gpt-3.5-turbo"
+        temperature=0.7,
+        model = "gpt-4"
     )
 
     streaming_llm_for_interview= ChatOpenAI(
@@ -41,39 +39,37 @@ def get_chain(interview_section, stream_handler, prompt, tracing: bool = False) 
         callback_manager=stream_manager,
         verbose=True,
         temperature=0.3,
-        model = "gpt-3.5-turbo-16k"
+        model = "gpt-4"
     )
-    memory = ConversationSummaryBufferMemory(llm=streaming_llm_for_interview, max_token_limit=10)
+
+    feedback_llm = ChatOpenAI(
+        streaming=True,
+        callback_manager=stream_manager,
+        verbose=True,
+        temperature=0.7,
+        model = "gpt-4"
+    )
+
+    # Share memory across agents 
+    memory = ConversationSummaryBufferMemory(llm=OpenAI(temperature=0), max_token_limit=1000)
 
     print("creating chain")
 
-    if interview_section == InterviewSections.CODING_INTERVIEW_INTRO:
+    if interview_section == InterviewSections.CODING_INTERVIEW_INTRO or interview_section == InterviewSections.CODING_INTERVIEW_OUTRO:
         conversation_chain = ConversationChain(
             prompt = prompt,
             llm=streaming_llm_for_intro, 
             verbose=True, 
-            memory=ConversationSummaryMemory(llm=OpenAI(temperature=0))
+            memory=memory
         )
     
-    elif interview_section == InterviewSections.CODING_INTERVIEW_QUESTION_INTRO:
+    elif interview_section == InterviewSections.CODING_INTERVIEW_QUESTION_INTRO or interview_section == InterviewSections.CODING_INTERVIEW or interview_section== InterviewSections.CODING_INTERVIEW_CONCLUSION or interview_section == InterviewSections.CODING_INTERVIEW_FEEDBACK:
         conversation_chain = ConversationChain(
             prompt = prompt,
             llm=streaming_llm_for_interview, 
             verbose=True, 
-            memory=ConversationSummaryMemory(llm=OpenAI(temperature=0))
-
+            memory=memory
         )
-        #conversation_chain = SimpleSequentialChain(chains=[constitutional_chain], verbose=True)
-            
-    elif interview_section == InterviewSections.CODING_INTERVIEW:
-        conversation_chain = ConversationChain(
-            prompt = prompt,
-            llm=streaming_llm_for_interview, 
-            verbose=True, 
-            memory=ConversationSummaryMemory(llm=OpenAI(temperature=0))
-
-        )
-    
     else:
         return None
 

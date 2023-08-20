@@ -8,11 +8,9 @@ with open('questions.json', 'r') as f:
 
 def get_question(interview_type):
     num = random.randint(0, 5)
+    num = 3
     if interview_type == InterviewTypes.CODING_INTERVIEW:
         question = questions_db["coding"][num]
         return f"""Question: {question["question"]} 
         Explaination {question["explaination"]}
         """
-
-
-#I'm doing well, thanks. How are you doing?

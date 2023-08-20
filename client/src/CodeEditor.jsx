@@ -25,7 +25,7 @@ export function CodeEditor(props) {
         const timer = setInterval(() => {
             var currentCode = editorRef.current.getValue()
             props.sendCurrentCode(currentCode);
-        }, 60000)
+        }, 6000)
         return () => {
             clearInterval(timer);
         };
@@ -52,7 +52,7 @@ export function CodeEditor(props) {
         "ruby",
         "php"
     ]);
-    const [language, setLanguage] = useState("javascript");
+    const [language, setLanguage] = useState("python");
 
     function handleChange(event) {
         monacoRef.current.editor.setModelLanguage(editorRef.current.getModel(), event.target.value);

@@ -12,9 +12,11 @@ const App = () => {
     const [chatMessages, setChatMessages] = useState([]);
     const [waitingForStreamToEnd, setWaitingForStreamToEnd] = useState(false)
     const [interviewId, setInterviewId] = useState(Math.random())
-    const [initialContent, setInitialContent] = useState("// piedpiper phone interivew")
+    const [initialContent, setInitialContent] = useState("#piedpiper phone interivew")
     const [audioSrc, setAudioSrc] = useState(null);
-    const [currentEditorContent, setCurrentEditorContent] = useState("// piedpiper phone interivew");
+    const [currentEditorContent, setCurrentEditorContent] = useState("#piedpiper phone interivew");
+
+    var startTime = Date.now();
 
     const prevMessageRef = useRef();
 
@@ -35,16 +37,19 @@ const App = () => {
     }
 
 
+    // Setup eleven api
+    const apiKey = `${import.meta.env.VITE_ELEVEN_LABS_API_KEY}`; // Replace with your Elevenlabs API key
+    const voiceId = "IsQVxKZH6osrAZXuiOdd"; // Brian
+    const headers = new Headers();
+    headers.append('Accept', 'audio/mpeg');
+    headers.append('xi-api-key', apiKey);
+    headers.append('Content-Type', 'application/json');
 
+    var ttsTextBuffer = ""
+    var waitForTTSStreamToEnd = false
     const speak = (text) => {
-        const apiKey = "5bb83d503e06369aff83abb071ec0f89"; // Replace with your Elevenlabs API key
-        const voiceId = "IsQVxKZH6osrAZXuiOdd"; // Brian
-
-        const headers = new Headers();
-        headers.append('Accept', 'audio/mpeg');
-        headers.append('xi-api-key', apiKey);
-        headers.append('Content-Type', 'application/json');
-
+        console.log(`starting to speak ${text} waitForTTSStreamToEnd ${waitForTTSStreamToEnd}`)
+        waitForTTSStreamToEnd = true;
         const body = JSON.stringify({
             text: text,
             model_id: 'eleven_monolingual_v1',
@@ -62,7 +67,16 @@ const App = () => {
             .then(response => response.blob())
             .then(blob => {
                 const url = window.URL.createObjectURL(blob);
-                new Audio(url).play();
+                var audio = new Audio(url)
+
+                audio.addEventListener('ended', () => {
+                    console.log('Audio playback has completed. Making waitForTTSStreamToEnd = false');
+                    waitForTTSStreamToEnd = false
+                });
+
+                audio.play()
+
+
             })
             .catch(error => console.error('Error:', error));
     };
@@ -86,6 +100,7 @@ const App = () => {
                         msg: currentMessage,
                         justCode: false
                     };
+                    startTime = Date.now()
                     interviewSocket.current.send(JSON.stringify(dataToBackend));
                     //currentAudioMessage = ""
                     setCurrentMessage("");
@@ -102,6 +117,8 @@ const App = () => {
     const sendCurrentCode = (code) => {
         if (!waitingForStreamToEnd) {
 
+            // Every minute and a half send the coding update for the LLM to review asynchronously.
+            // Preferably dispatch a webworker? 
             if (code != currentEditorContent) {
                 const dataToBackend = {
                     interview_id: interviewId,
@@ -109,6 +126,7 @@ const App = () => {
                     justCode: true
                 };
                 console.log(`Sending to backend ${JSON.stringify(dataToBackend)}`)
+                startTime = Date.now()
                 interviewSocket.current.send(JSON.stringify(dataToBackend));
                 setWaitingForStreamToEnd(true)
             } else {
@@ -135,8 +153,15 @@ const App = () => {
 
         } else if (message.type === "stream") {
             // Handle the actual stream message
+
             console.log("Stream message:", message.message);
             currMessage += message.message
+            ttsTextBuffer += message.message
+            if (!waitForTTSStreamToEnd) {
+                speak(ttsTextBuffer)
+                ttsTextBuffer = ""
+            }
+
 
         }
         else if (message.type === "info") {
@@ -154,10 +179,25 @@ const App = () => {
                 setInterviewState("started")
             }
 
+            const intervalId = setInterval(() => {
+                if (!waitForTTSStreamToEnd) {
+                    console.log("The waitForTTSStreamToEnd is now false! Let's start with the next stream");
+                    speak(ttsTextBuffer);
+                    ttsTextBuffer = "";
+                    clearInterval(intervalId);
+                } else {
+                    console.log("Waiting for the waitForTTSStreamToEnd to become false...");
+                }
+            }, 300); // Check every 0.3 second
+
+
             // Handle the end of the stream
             // Update chatMessages state if needed
 
-            speak(currMessage)
+            var latency = Date.now() - startTime;
+            console.log(`Latency: ${latency} ms`);
+            //speak(currMessage)
+
             prevMessages.push(currMessage);
             setChatMessages([...prevMessages])
 
@@ -182,6 +222,7 @@ const App = () => {
                 interviewSocket.current = new WebSocket('ws://localhost:9000/chat');
 
                 interviewSocket.current.addEventListener('open', () => {
+                    startTime = Date.now();
                     interviewSocket.current.send(JSON.stringify(dataToSend));
                 });
 

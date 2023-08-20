@@ -37,19 +37,19 @@ def get_current_interview_section(start_time):
     diff = (current_time - start_time).total_seconds() / 60
 
     # Prompt for intro 
-    if diff < 0:
+    if diff < 1:
         interview_agent.set_current_chain(InterviewSections.CODING_INTERVIEW_INTRO)
         return InterviewSections.CODING_INTERVIEW_INTRO
-    elif diff > 0 and diff < 1:
+    elif diff > 1 and diff < 2:
         interview_agent.set_current_chain(InterviewSections.CODING_INTERVIEW_QUESTION_INTRO)
         return InterviewSections.CODING_INTERVIEW_QUESTION_INTRO
-    elif diff > 1 and diff < 15:
+    elif diff > 2 and diff < 4:
         interview_agent.set_current_chain(InterviewSections.CODING_INTERVIEW)
         return InterviewSections.CODING_INTERVIEW
-    elif diff >  35 and diff < 40:
+    elif diff >  4 and diff < 5:
         interview_agent.set_current_chain(InterviewSections.CODING_INTERVIEW_CONCLUSION)
         return InterviewSections.CODING_INTERVIEW_CONCLUSION
-    elif diff > 40 and diff < 45:
+    elif diff > 5 and diff < 6:
         interview_agent.set_current_chain(InterviewSections.CODING_INTERVIEW_OUTRO)
         return InterviewSections.CODING_INTERVIEW_OUTRO
     else:
@@ -64,6 +64,13 @@ def setup_interview_agent(stream_handler, question):
         current_chain = get_chain(interview_section, stream_handler, prompt_template, False)
         interview_agent.add_chain(interview_section, current_chain)
     logging.info("Setup agent")
+
+# TODO Make this into a class so that there's cleaner interface to update prompts
+def update_chains(interview_section, stream_handler, question, code):
+    interivew_conclusion_prompt_template = get_prompts(interview_section, question, code)
+    interview_section_chain = get_chain(interview_section, stream_handler, interivew_conclusion_prompt_template, False)
+    interview_agent.update_chains(interview_section, interview_section_chain)
+    logging.info("Updated agent")
 
 @app.on_event("startup")
 async def startup_event():
@@ -83,7 +90,7 @@ async def websocket_endpoint(websocket: WebSocket):
     interview_dict = {}
     
     logging.info("##### ##### ##### ###### ###### ###### ####### ####### ######## ######## ")
-
+    most_recent_code = None
     while True:
         try:
             # Receive and send back the client message
@@ -108,7 +115,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
             if request["msg"] == "START_INTERVIEW":
                 print("starting interview")
-                current_input = "Hi there!"
+                current_input = "Hello! [Begin Interview]"
             else:
                 current_input = request["msg"]
             
@@ -118,12 +125,25 @@ async def websocket_endpoint(websocket: WebSocket):
     
 
             if request["justCode"] == True:
+                logging.info("Just code is true and hence updating chains")
                 current_input += "\n Just Code: True"
+                most_recent_code = current_input
+                # make sure most_recent_code is set in the prompt 
+                update_chains(InterviewSections.CODING_INTERVIEW_CONCLUSION, stream_handler, question, most_recent_code)
+                update_chains(InterviewSections.CODING_INTERVIEW_OUTRO, stream_handler, question, most_recent_code)
+                update_chains(InterviewSections.CODING_INTERVIEW_FEEDBACK, stream_handler, question, most_recent_code)
+                logging.info("Chains updated")
+
+            if interview_agent.get_current_interview_section() == InterviewSections.CODING_INTERVIEW_FEEDBACK:
+                current_input = chat_history
+            
+            logging.info("Sending a call to LLM")
             result = await interview_chain.acall({"input": current_input})
 
-            chat_history.append((current_input, result["response"]))
+            if request["justCode"] == False:
+                chat_history.append((current_input, result["response"]))
+            
             print(f"answer {result}")
-            chat_history.append((request["msg"], result["response"]))
             logging.info(f"{sent_question_to_the_frontend} current_section {current_section} question {question}")
             # A hack to display question on the code editor as well as display it 
             if sent_question_to_the_frontend == False and interview_agent.get_current_interview_section() == InterviewSections.CODING_INTERVIEW_QUESTION_INTRO:

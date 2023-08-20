@@ -24,6 +24,15 @@ class InterviewAgent():
             return True
         return False
     
+    def update_chains(self, chain_id: int, chain: ConversationChain) -> bool:
+        if chain_id in self.chain_id_dict:
+            self.chain_id_dict[chain_id] = chain
+            return True
+        return False
+
+    def get_current_chain_id(self) -> int:
+        return self.current_chain_id
+    
     def get_current_interview_section(self):
         return self.current_chain_id
     
