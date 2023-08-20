@@ -18,6 +18,7 @@ from agents import InterviewAgent
 from prompts import get_prompts
 from questions import get_question
 from interview_types import InterviewTypes
+import json
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -36,10 +37,10 @@ def get_current_interview_section(start_time):
     diff = (current_time - start_time).total_seconds() / 60
 
     # Prompt for intro 
-    if diff < 1:
+    if diff < 5:
         interview_agent.set_current_chain(InterviewSections.CODING_INTERVIEW_INTRO)
         return InterviewSections.CODING_INTERVIEW_INTRO
-    elif diff > 1 and diff < 10:
+    elif diff > 5 and diff < 10:
         interview_agent.set_current_chain(InterviewSections.CODING_INTERVIEW_QUESTION_INTRO)
         return InterviewSections.CODING_INTERVIEW_QUESTION_INTRO
     elif diff > 10 and diff < 35:
@@ -87,7 +88,9 @@ async def websocket_endpoint(websocket: WebSocket):
     while True:
         try:
             # Receive and send back the client message
-            request = await websocket.receive_json()
+            message = await websocket.receive_text()
+            request = json.loads(message)
+
             print(request)
             interview_id = request["interview_id"]
             if interview_id not in interview_dict:

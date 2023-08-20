@@ -2,6 +2,7 @@
 from langchain.callbacks.manager import AsyncCallbackManager
 from langchain.callbacks.tracers import LangChainTracer
 from langchain.chains import ConversationChain
+from langchain.chains.constitutional_ai.base import ConstitutionalChain
 from langchain.chains.llm import LLMChain
 from langchain.chains.question_answering import load_qa_chain
 from langchain.llms import OpenAI
@@ -12,7 +13,7 @@ from typing import Any, Dict, List
 
 from langchain.chains.constitutional_ai.models import ConstitutionalPrinciple
 
-ethical_principle = ConstitutionalPrinciple(
+interview_ethics_principle = ConstitutionalPrinciple(
     name="Ethical Interviewer Principle",
     critique_request="The model should behave like a real-world interviewer. It should make sure that the response is more conscise and less leading.",
     revision_request="Rewrite the model's output to be like a real-world interviewer without giving lot of the answer away.",
@@ -81,28 +82,31 @@ def get_chain(interview_section, stream_handler, prompt, tracing: bool = False) 
             verbose=True, 
             memory=ConversationBufferMemory()
         )
-    elif interview_section == InterviewSections.CODING_INTERVIEW:
-        constitutional_chain = ConstitutionalChain.from_llm(
-            chain=evil_qa_chain,
-            constitutional_principles=[ethical_principle],
-            llm=streaming_llm_for_interview,
-            verbose=True,
-            memory=memory)
-    
-    elif interview_section == InterviewSections.CODING_INTERVIEW_CONCLUSION:
-        constitutional_chain = ConstitutionalChain.from_llm(
-            chain=evil_qa_chain,
-            constitutional_principles=[ethical_principle],
-            llm=streaming_llm_for_interview,
-            verbose=True,
-            memory=memory)
-
-    elif interview_section == InterviewSections.CODING_INTERVIEW_OUTRO:
-        constitutional_chain = ConstitutionalChain.from_llm(
-            chain=evil_qa_chain,
-            constitutional_principles=[ethical_principle],
-            llm=streaming_llm_for_interview,
-            verbose=True,
-            memory=memory)
+    else:
+        return None
 
     return conversation_chain
+
+    #     elif interview_section == InterviewSections.CODING_INTERVIEW:
+    #     constitutional_chain = ConstitutionalChain.from_llm(
+    #         chain=streaming_llm_for_interview,
+    #         constitutional_principles=[interview_ethics_principle],
+    #         llm=streaming_llm_for_interview,
+    #         verbose=True,
+    #         memory=memory)
+    
+    # elif interview_section == InterviewSections.CODING_INTERVIEW_CONCLUSION:
+    #     constitutional_chain = ConstitutionalChain.from_llm(
+    #         chain=streaming_llm_for_interview,
+    #         constitutional_principles=[interview_ethics_principle],
+    #         llm=streaming_llm_for_interview,
+    #         verbose=True,
+    #         memory=memory)
+
+    # elif interview_section == InterviewSections.CODING_INTERVIEW_OUTRO:
+    #     constitutional_chain = ConstitutionalChain.from_llm(
+    #         chain=streaming_llm_for_interview,
+    #         constitutional_principles=[interview_ethics_principle],
+    #         llm=streaming_llm_for_interview,
+    #         verbose=True,
+    #         memory=memory)
