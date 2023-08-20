@@ -14,11 +14,16 @@ const App = () => {
 
     const prevMessageRef = useRef();
 
+    var currentAudioMessage = "";
 
     const [interviewState, setInterviewState] = useState("");
 
     const updateCurrentMessage = (message) => {
         setCurrentMessage(message);
+    }
+
+    const addToCurrentAudioMessage = (msg) => {
+        currentAudioMessage = currentAudioMessage + " " + message
     }
 
     const getCurrentMessage = () => {
@@ -42,6 +47,7 @@ const App = () => {
                         msg: currentMessage
                     };
                     interviewSocket.current.send(JSON.stringify(dataToBackend));
+                    //currentAudioMessage = ""
                     setCurrentMessage("");
                 }
             }
@@ -66,6 +72,15 @@ const App = () => {
             // Handle the actual stream message
             console.log("Stream message:", message.message);
             currMessage += message.message
+
+        }
+        else if (message.type === "info") {
+            // Handle the actual stream message
+            console.log("info message:", message.message);
+            if (message.message.includes("QUESTION")) {
+                console.log(`Qustion Message: ${message.message}`)
+                setInitialContent((_initialContent) => _initialContent + "\n" + message.message)
+            }
 
         } else if (message.type === "end") {
 
@@ -136,7 +151,7 @@ const App = () => {
             </div>
             <div className="content">
                 <div className="coding-editor">
-                    <CodeEditor initialContent={initialContent} />
+                    <CodeEditor initialContent={initialContent} setQuestion={initialContent.includes("QUESTION")} />
                 </div>
                 <div className="chat-window">
                     <h2>Chat Window</h2>

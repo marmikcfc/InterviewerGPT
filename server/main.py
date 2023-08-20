@@ -23,8 +23,9 @@ import json
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 #os.environ["OPENAI_API_KEY"] = ""
+logging.basicConfig(level = logging.DEBUG)
 
-interview_dict = {}
+
 chat_history = []
 interview_agent = InterviewAgent()
 interview_started = False
@@ -37,10 +38,10 @@ def get_current_interview_section(start_time):
     diff = (current_time - start_time).total_seconds() / 60
 
     # Prompt for intro 
-    if diff < 5:
+    if diff < 0:
         interview_agent.set_current_chain(InterviewSections.CODING_INTERVIEW_INTRO)
         return InterviewSections.CODING_INTERVIEW_INTRO
-    elif diff > 5 and diff < 10:
+    elif diff > 0 and diff < 10:
         interview_agent.set_current_chain(InterviewSections.CODING_INTERVIEW_QUESTION_INTRO)
         return InterviewSections.CODING_INTERVIEW_QUESTION_INTRO
     elif diff > 10 and diff < 35:
@@ -84,6 +85,8 @@ async def websocket_endpoint(websocket: WebSocket):
     question = get_question(InterviewTypes.CODING_INTERVIEW)
     setup_interview_agent(stream_handler, question)
     current_section = InterviewSections.CODING_INTERVIEW_INTRO
+    sent_question_to_the_frontend = False
+    interview_dict = {}
 
     while True:
         try:
@@ -117,14 +120,19 @@ async def websocket_endpoint(websocket: WebSocket):
                 logging.info(f"Changing current section to {interview_agent.get_current_interview_section} as it has changed")
                 current_section = interview_agent.get_current_interview_section
 
-            if interview_agent.get_current_interview_section() != InterviewSections.CODING_INTERVIEW_INTRO:
-                result = await interview_chain.acall({"input": request["msg"]})
-            else:
-                result = await interview_chain.acall({"input": request["msg"]})
-            chat_history.append((request["msg"], result["response"]))
+            result = await interview_chain.acall({"input": current_input})
+            
+            chat_history.append((current_input, result["response"]))
             print(f"answer {result}")
             chat_history.append((request["msg"], result["response"]))
+            logging.info(f"{sent_question_to_the_frontend} current_section {current_section} question {question}")
+            # A hack to display question on the code editor as well as display it 
+            if sent_question_to_the_frontend == False and interview_agent.get_current_interview_section() == InterviewSections.CODING_INTERVIEW_QUESTION_INTRO:
+                logging.info("sending the question as a info message to the frontend")
+                await stream_handler.send_specific_information(question) 
+                sent_question_to_the_frontend = True
 
+            logging.info("Sent it to the frontend")
             # Flush out remaining tokens in the buffer
             await stream_handler.flush_buffer() 
             end_resp = ChatResponse(sender="interviewer", message="", type="end")
@@ -132,6 +140,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
         except WebSocketDisconnect:
             logging.info("websocket disconnect")
+            # Hack for testing remove soon
+            interview_dict = {}
             break
         except Exception as e:
             logging.error(e)

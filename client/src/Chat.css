@@ -2,8 +2,8 @@
     background-color: #f7f7f7;
     border-radius: 8px;
     padding: 20px;
-    max-height: 300px;
     overflow-y: auto;
+    height: 70vh;
 }
 
 .message {

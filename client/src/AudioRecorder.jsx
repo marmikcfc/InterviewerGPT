@@ -57,9 +57,9 @@ const AudioRecorder = (props) => {
             const transcript = received.channel.alternatives[0].transcript;
             if (transcript && received.is_final) {
                 setTranscript((_prev) => [..._prev, transcript]);
-                var currentMessage = props.getCurrentMessage();
-                currentMessage += transcript;
-                props.updateCurrentMessage(currentMessage);
+                //var currentMessage = props.getCurrentMessage();
+                //currentMessage += " " + transcript;
+                props.updateCurrentMessage((_currMessage) => _currMessage + " " + transcript);
                 console.log(`transcript ${transcript}`);
             }
         });

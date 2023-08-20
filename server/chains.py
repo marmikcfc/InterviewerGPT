@@ -27,7 +27,6 @@ class ExtendedConversationBufferMemory(ConversationBufferMemory):
     @property
     def memory_variables(self) -> List[str]:
         """Will always return list of memory variables."""
-        logging.info(f"#### #### #### ####{self.memory_key}")
         return [self.memory_key] + self.extra_variables
 
     def load_memory_variables(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
@@ -54,7 +53,7 @@ def get_chain(interview_section, stream_handler, prompt, tracing: bool = False) 
         streaming=True,
         callback_manager=stream_manager,
         verbose=True,
-        temperature=0.7,
+        temperature=1,
     )
 
     streaming_llm_for_interview= OpenAI(

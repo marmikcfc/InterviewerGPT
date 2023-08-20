@@ -33,11 +33,12 @@ def get_prompts(current_section, question = None):
 
         Human: {input}
 
-        AI Assistant:
+        AI Assistant: 
+        Question: 
+
+        Further Addition:
         """
-        print("###### CREATING PROMPT")
         question_intro_prompt = InterviewPromptTemplate(input_variables=["history", "input"], template=template, question = question)
-        print(f"###### CREATED PROMPT {question_intro_prompt}")
         return question_intro_prompt
     
     if current_section == InterviewSections.CODING_INTERVIEW:

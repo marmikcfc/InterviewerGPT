@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import Editor from '@monaco-editor/react';
 import { useState } from 'react';
 import { FormControl, InputLabel, Select, MenuItem } from "@mui/material";
+import { useEffect } from 'react';
 
 export function CodeEditor(props) {
     const editorRef = useRef(null);
@@ -11,7 +12,21 @@ export function CodeEditor(props) {
     function handleEditorDidMount(editor, monaco) {
         editorRef.current = editor;
         monacoRef.current = monaco;
+        if (props.question != null) {
+            editorRef.current.getModel().setValue(props.initialContent)
+        }
     }
+
+    const [content, setQuestion] = useState(props.initialContent);
+
+
+    useEffect(() => {
+        if (editorRef.current) {
+            editorRef.current.setValue(props.initialContent);
+        }
+        alert(`content ${content}`)
+    }, [content]);
+
 
     function showValue() {
         alert(editorRef.current.getValue());
@@ -31,6 +46,8 @@ export function CodeEditor(props) {
         monacoRef.current.editor.setModelLanguage(editorRef.current.getModel(), event.target.value);
         setLanguage(event.target.value);
     }
+
+
 
 
     return (
@@ -60,6 +77,7 @@ export function CodeEditor(props) {
                 defaultLanguage="python"
                 defaultValue={props.initialContent}
                 onMount={handleEditorDidMount}
+                key={props.initialContent}
             />
         </div>
     )

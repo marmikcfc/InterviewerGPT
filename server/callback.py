@@ -23,14 +23,20 @@ class StreamingLLMCallbackHandler(AsyncCallbackHandler):
                 message_to_send = " ".join(words)
                 self.token_buffer = ""
 
-            resp = ChatResponse(sender="interviewer", message=message_to_send, type="stream")
+            resp = ChatResponse(sender="interviewer", message=" "+message_to_send+" ", type="stream")
             await self.websocket.send_json(resp.dict())
     
     async def flush_buffer(self):
+
         # Just send the remaining words
         words = self.token_buffer.split()
         message_to_send = " ".join(words)
-        resp = ChatResponse(sender="interviewer", message=message_to_send, type="stream")
+        resp = ChatResponse(sender="interviewer", message=" "+message_to_send+" ", type="stream")
         self.token_buffer = ""
         await self.websocket.send_json(resp.dict())
     
+
+    async def send_specific_information(self, info):
+        data = f"""/* QUESTION:\n{info} */"""
+        resp = ChatResponse(sender="interviewer", message=data, type="info")
+        await self.websocket.send_json(resp.dict())
