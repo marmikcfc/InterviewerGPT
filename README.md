@@ -11,12 +11,12 @@ Interviewing is painful process and it takes a lot of engineering bandwidth, the
 ## Task
 - [X] Set up websockets over fastapi 
 - [X] Set up chains, streaming, intro to interview agent
-- [x] Set up output parser to collect words from a stream of tokens so that eleven labs api can be streamed
-- [] Agentify the structure to be able to add multiple chain
-- [] Set up other agents to carry out a full coding interview 
-- [] Refactor and remove all the crap that might have been introduced by now
+- [X] Set up output parser to collect words from a stream of tokens so that eleven labs api can be streamed
+- [X] Agentify the structure to be able to add multiple chain
+- [] Set up other agents to carry out a full coding interview
+- [X] Refactor and remove all the crap that might have been introduced by now
 - [] React frontend with editor and react chat window
-- [] Add openAI Whisper for the Speech to text
+- [] Add deepgram for the Speech to text
 - [] Add elevenlabs for text to speech and direct audio transfer over websocklets
 - [] Store transcripts in vector store for semantic search
 - [] View transcripts on a dashboard

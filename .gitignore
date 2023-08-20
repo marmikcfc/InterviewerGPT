@@ -1,0 +1,7 @@
+# Ignore server __pycache__ folders
+server/__pycache__/
+
+# Ignore client node_modules folders
+client/node_modules/
+
+client/.env
