@@ -32,6 +32,9 @@ const AudioRecorder = (props) => {
     };
 
     const startRecording = async () => {
+
+        console.log("Starting the interview")
+        props.toggleInterviewState("start")
         setRecordingStatus("recording");
         mediaRecorder.current = new MediaRecorder(stream, { type: mimeType });
 
@@ -75,6 +78,8 @@ const AudioRecorder = (props) => {
     };
 
     const stopRecording = () => {
+        console.log("Stopping the interview")
+        props.toggleInterviewState("end")
         setRecordingStatus("inactive");
         mediaRecorder.current.stop();
         mediaRecorder.current.onstop = () => {
@@ -87,7 +92,6 @@ const AudioRecorder = (props) => {
 
     return (
         <div>
-            <h2>Audio Recorder</h2>
             <main>
                 <div className="audio-controls">
                     {!permission ? (
@@ -97,26 +101,26 @@ const AudioRecorder = (props) => {
                     ) : null}
                     {permission && recordingStatus === "inactive" ? (
                         <button onClick={startRecording} type="button">
-                            Start Recording
+                            Start Interview
                         </button>
                     ) : null}
                     {recordingStatus === "recording" ? (
                         <button onClick={stopRecording} type="button">
-                            Stop Recording
+                            Stop Interview
                         </button>
                     ) : null}
                 </div>
-                {audio ? (
+                {/* {audio ? (
                     <div className="audio-player">
                         <audio src={audio} controls></audio>
                         <br />
-                        {/* <button>
+                        <button>
                             <a download href={audio}>
                                 Download Recording
                             </a>
-                        </button> */}
+                        </button> 
                     </div>
-                ) : null}
+                ) : null} */}
             </main>
 
         </div>

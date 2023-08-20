@@ -4,10 +4,7 @@
   align-items: center;
   width: 100%;
   padding: 20px;
-}
-
-.recorder {
-  margin: 20px 0;
+  min-width: 98%;
 }
 
 .content {
@@ -26,9 +23,11 @@
 }
 
 .coding-editor {
+  flex: 70;
   margin-right: 5px;
 }
 
 .chat-window {
+  flex: 30;
   margin-left: 5px;
 }
