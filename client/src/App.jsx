@@ -22,7 +22,7 @@ const App = () => {
     }
 
     // Initialize socket as a class variable
-    const socket = useRef(null);
+    const interviewSocket = useRef(null);
 
     useEffect(() => {
         prevMessageRef.current = currentMessage;
@@ -32,12 +32,12 @@ const App = () => {
         const timer = setInterval(() => {
             if (prevMessageRef.current === currentMessage) {
                 // Send currentMessage to the backend before clearing
-                if (socket.current && currentMessage !== "" && !waitingForStreamToEnd) {
+                if (interviewSocket.current && currentMessage !== "" && !waitingForStreamToEnd) {
                     const dataToBackend = {
                         interview_id: interviewId,
                         msg: currentMessage
                     };
-                    socket.current.send(JSON.stringify(dataToBackend));
+                    interviewSocket.current.send(JSON.stringify(dataToBackend));
                     setCurrentMessage("");
                 }
             }
@@ -45,10 +45,6 @@ const App = () => {
 
         return () => {
             clearInterval(timer);
-            // Close WebSocket connection when component unmounts or interview ends
-            if (socket.current) {
-                socket.current.close();
-            }
         };
     }, [currentMessage]);
 
@@ -88,37 +84,47 @@ const App = () => {
 
 
     useEffect(() => {
-        if (interviewState == "start") {
+        if (interviewState === "start") {
             const dataToSend = {
-                interview_id: interviewId,
+                interview_id: 1,
                 msg: "START_INTERVIEW"
             };
 
-            // Initialize socket when interview starts
-            socket.current = new WebSocket('ws://localhost:9000/chat');
-            socket.current.addEventListener('open', () => {
-                socket.current.send(JSON.stringify(dataToSend));
-            });
             setWaitingForStreamToEnd(true);
 
-            // Receive messages from WebSocket
-            socket.current.addEventListener('message', (event) => {
-                const receivedMessage = JSON.parse(event.data);
-                handleIncomingMessage(receivedMessage);
-            });
+            // Initialize socket only if it's not already initialized
+            if (!interviewSocket.current) {
+                interviewSocket.current = new WebSocket('ws://localhost:9000/chat');
 
-            // WebSocket close event
-            socket.current.addEventListener('close', (event) => {
-                console.log('WebSocket connection closed:', event);
-                // Perform actions on WebSocket close if needed
-            });
-        } else if (interviewState == "end") {
-            // Close WebSocket connection when interview ends
-            if (socket.current) {
-                socket.current.close();
+                interviewSocket.current.addEventListener('open', () => {
+                    interviewSocket.current.send(JSON.stringify(dataToSend));
+                });
+
+                // Receive messages from WebSocket
+                interviewSocket.current.addEventListener('message', (event) => {
+                    const receivedMessage = JSON.parse(event.data);
+                    handleIncomingMessage(receivedMessage);
+                });
+
+                // WebSocket close event
+                interviewSocket.current.addEventListener('close', (event) => {
+                    console.log('WebSocket connection closed:', event);
+                });
             }
         }
     }, [interviewState]);
+
+    useEffect(() => {
+        if (interviewState === "end") {
+            // Close WebSocket connection when interview ends
+            if (interviewSocket.current) {
+                alert("closing the websocket");
+                interviewSocket.current.close();
+                interviewSocket.current = null;  // Reset socket ref after closing
+            }
+        }
+    }, [interviewState]);
+
 
     return (
         <div className="container">
