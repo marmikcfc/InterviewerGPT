@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { CodeEditor } from "./CodeEditor";
 import { Chat } from "./ChatWindow";
 
+import ReactAudioPlayer from 'react-audio-player';
+
 const App = () => {
     const [currentMessage, setCurrentMessage] = useState("");
     const [currentReceivedMessage, setCurrentReceivedMessage] = useState("");
@@ -11,6 +13,8 @@ const App = () => {
     const [waitingForStreamToEnd, setWaitingForStreamToEnd] = useState(false)
     const [interviewId, setInterviewId] = useState(Math.random())
     const [initialContent, setInitialContent] = useState("// piedpiper phone interivew")
+    const [audioSrc, setAudioSrc] = useState(null);
+    const [currentEditorContent, setCurrentEditorContent] = useState("// piedpiper phone interivew");
 
     const prevMessageRef = useRef();
 
@@ -30,11 +34,46 @@ const App = () => {
         return currentMessage;
     }
 
+
+
+    const speak = (text) => {
+        const apiKey = "5bb83d503e06369aff83abb071ec0f89"; // Replace with your Elevenlabs API key
+        const voiceId = "IsQVxKZH6osrAZXuiOdd"; // Brian
+
+        const headers = new Headers();
+        headers.append('Accept', 'audio/mpeg');
+        headers.append('xi-api-key', apiKey);
+        headers.append('Content-Type', 'application/json');
+
+        const body = JSON.stringify({
+            text: text,
+            model_id: 'eleven_monolingual_v1',
+            voice_settings: {
+                stability: 0.5,
+                similarity_boost: 0.5
+            }
+        });
+
+        fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`, {
+            method: 'POST',
+            headers: headers,
+            body: body
+        })
+            .then(response => response.blob())
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                new Audio(url).play();
+            })
+            .catch(error => console.error('Error:', error));
+    };
+
+
     // Initialize socket as a class variable
     const interviewSocket = useRef(null);
 
     useEffect(() => {
         prevMessageRef.current = currentMessage;
+
     }, [currentMessage]);
 
     useEffect(() => {
@@ -44,7 +83,8 @@ const App = () => {
                 if (interviewSocket.current && currentMessage !== "" && !waitingForStreamToEnd) {
                     const dataToBackend = {
                         interview_id: interviewId,
-                        msg: currentMessage
+                        msg: currentMessage,
+                        justCode: false
                     };
                     interviewSocket.current.send(JSON.stringify(dataToBackend));
                     //currentAudioMessage = ""
@@ -57,6 +97,31 @@ const App = () => {
             clearInterval(timer);
         };
     }, [currentMessage]);
+
+
+    const sendCurrentCode = (code) => {
+        if (!waitingForStreamToEnd) {
+
+            if (code != currentEditorContent) {
+                const dataToBackend = {
+                    interview_id: interviewId,
+                    msg: code,
+                    justCode: true
+                };
+                console.log(`Sending to backend ${JSON.stringify(dataToBackend)}`)
+                interviewSocket.current.send(JSON.stringify(dataToBackend));
+                setWaitingForStreamToEnd(true)
+            } else {
+                console.log("No changes in the editor and hence not sending it to backend")
+            }
+
+
+        } else {
+            // just append to current message
+            setCurrentMessage((_msg) => _msg + "\n CODE" + code)
+        }
+    }
+
 
     var currMessage = ""
     var prevMessages = []
@@ -80,6 +145,7 @@ const App = () => {
             if (message.message.includes("QUESTION")) {
                 console.log(`Qustion Message: ${message.message}`)
                 setInitialContent((_initialContent) => _initialContent + "\n" + message.message)
+                setCurrentEditorContent((_currentEditorContent) => _currentEditorContent + "\n" + message.message)
             }
 
         } else if (message.type === "end") {
@@ -91,6 +157,7 @@ const App = () => {
             // Handle the end of the stream
             // Update chatMessages state if needed
 
+            speak(currMessage)
             prevMessages.push(currMessage);
             setChatMessages([...prevMessages])
 
@@ -104,7 +171,8 @@ const App = () => {
         if (interviewState === "start") {
             const dataToSend = {
                 interview_id: 1,
-                msg: "START_INTERVIEW"
+                msg: "START_INTERVIEW",
+                justCode: false
             };
 
             setWaitingForStreamToEnd(true);
@@ -151,13 +219,24 @@ const App = () => {
             </div>
             <div className="content">
                 <div className="coding-editor">
-                    <CodeEditor initialContent={initialContent} setQuestion={initialContent.includes("QUESTION")} />
+                    <CodeEditor initialContent={initialContent} setQuestion={initialContent.includes("QUESTION")} sendCurrentCode={sendCurrentCode} />
                 </div>
                 <div className="chat-window">
                     <h2>Chat Window</h2>
                     <Chat chatMessages={chatMessages} />
                 </div>
             </div>
+
+            <div style={{ display: "none" }}>
+                {audioSrc && (
+                    <ReactAudioPlayer
+                        src={audioSrc}
+                        autoPlay
+                        controls
+                    />
+                )}
+            </div>
+
 
             Current Message Transcribed from Deepgram:  {currentMessage}
             <br />

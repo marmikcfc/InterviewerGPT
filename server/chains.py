@@ -6,36 +6,15 @@ from langchain.chains.constitutional_ai.base import ConstitutionalChain
 from langchain.chains.llm import LLMChain
 from langchain.chains.question_answering import load_qa_chain
 from langchain.llms import OpenAI
-from langchain.memory import ConversationBufferMemory, ConversationSummaryBufferMemory
+from langchain.chat_models import ChatOpenAI
+from langchain.memory import ConversationBufferMemory, ConversationSummaryBufferMemory, ConversationSummaryMemory
 from interview_sections import InterviewSections 
 import logging
 from typing import Any, Dict, List
+from langchain.chains import SimpleSequentialChain
+
 
 from langchain.chains.constitutional_ai.models import ConstitutionalPrinciple
-
-interview_ethics_principle = ConstitutionalPrinciple(
-    name="Ethical Interviewer Principle",
-    critique_request="The model should behave like a real-world interviewer. It should make sure that the response is more conscise and less leading.",
-    revision_request="Rewrite the model's output to be like a real-world interviewer without giving lot of the answer away.",
-)
-
-
-
-class ExtendedConversationBufferMemory(ConversationBufferMemory):
-    extra_variables:List[str] = []
-
-    @property
-    def memory_variables(self) -> List[str]:
-        """Will always return list of memory variables."""
-        return [self.memory_key] + self.extra_variables
-
-    def load_memory_variables(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        """Return buffer with history and extra variables"""
-        d = super().load_memory_variables(inputs)
-        d.update({k:inputs.get(k) for k in self.extra_variables})        
-        return d
-
-
 
 def get_chain(interview_section, stream_handler, prompt, tracing: bool = False) -> ConversationChain:
     """Create a converstion introduction chain for question/answering."""
@@ -49,18 +28,20 @@ def get_chain(interview_section, stream_handler, prompt, tracing: bool = False) 
         question_manager.add_handler(tracer)
         stream_manager.add_handler(tracer)
 
-    streaming_llm_for_intro = OpenAI(
+    streaming_llm_for_intro = ChatOpenAI(
         streaming=True,
         callback_manager=stream_manager,
         verbose=True,
         temperature=1,
+        model = "gpt-3.5-turbo"
     )
 
-    streaming_llm_for_interview= OpenAI(
+    streaming_llm_for_interview= ChatOpenAI(
         streaming=True,
         callback_manager=stream_manager,
         verbose=True,
-        temperature=0,
+        temperature=0.3,
+        model = "gpt-3.5-turbo-16k"
     )
     memory = ConversationSummaryBufferMemory(llm=streaming_llm_for_interview, max_token_limit=10)
 
@@ -71,16 +52,28 @@ def get_chain(interview_section, stream_handler, prompt, tracing: bool = False) 
             prompt = prompt,
             llm=streaming_llm_for_intro, 
             verbose=True, 
-            memory=ConversationBufferMemory()
+            memory=ConversationSummaryMemory(llm=OpenAI(temperature=0))
         )
     
     elif interview_section == InterviewSections.CODING_INTERVIEW_QUESTION_INTRO:
         conversation_chain = ConversationChain(
             prompt = prompt,
-            llm=streaming_llm_for_intro, 
+            llm=streaming_llm_for_interview, 
             verbose=True, 
-            memory=ConversationBufferMemory()
+            memory=ConversationSummaryMemory(llm=OpenAI(temperature=0))
+
         )
+        #conversation_chain = SimpleSequentialChain(chains=[constitutional_chain], verbose=True)
+            
+    elif interview_section == InterviewSections.CODING_INTERVIEW:
+        conversation_chain = ConversationChain(
+            prompt = prompt,
+            llm=streaming_llm_for_interview, 
+            verbose=True, 
+            memory=ConversationSummaryMemory(llm=OpenAI(temperature=0))
+
+        )
+    
     else:
         return None
 

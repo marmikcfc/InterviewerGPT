@@ -21,7 +21,6 @@ from interview_types import InterviewTypes
 import json
 
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
 #os.environ["OPENAI_API_KEY"] = ""
 logging.basicConfig(level = logging.DEBUG)
 
@@ -41,10 +40,10 @@ def get_current_interview_section(start_time):
     if diff < 0:
         interview_agent.set_current_chain(InterviewSections.CODING_INTERVIEW_INTRO)
         return InterviewSections.CODING_INTERVIEW_INTRO
-    elif diff > 0 and diff < 10:
+    elif diff > 0 and diff < 1:
         interview_agent.set_current_chain(InterviewSections.CODING_INTERVIEW_QUESTION_INTRO)
         return InterviewSections.CODING_INTERVIEW_QUESTION_INTRO
-    elif diff > 10 and diff < 35:
+    elif diff > 1 and diff < 15:
         interview_agent.set_current_chain(InterviewSections.CODING_INTERVIEW)
         return InterviewSections.CODING_INTERVIEW
     elif diff >  35 and diff < 40:
@@ -70,11 +69,6 @@ def setup_interview_agent(stream_handler, question):
 async def startup_event():
     logging.info("startup")
 
-@app.get("/")
-async def get(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-
 @app.websocket("/chat")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -87,6 +81,8 @@ async def websocket_endpoint(websocket: WebSocket):
     current_section = InterviewSections.CODING_INTERVIEW_INTRO
     sent_question_to_the_frontend = False
     interview_dict = {}
+    
+    logging.info("##### ##### ##### ###### ###### ###### ####### ####### ######## ######## ")
 
     while True:
         try:
@@ -119,9 +115,12 @@ async def websocket_endpoint(websocket: WebSocket):
             if interview_agent.get_current_interview_section() != current_section:
                 logging.info(f"Changing current section to {interview_agent.get_current_interview_section} as it has changed")
                 current_section = interview_agent.get_current_interview_section
+    
 
+            if request["justCode"] == True:
+                current_input += "\n Just Code: True"
             result = await interview_chain.acall({"input": current_input})
-            
+
             chat_history.append((current_input, result["response"]))
             print(f"answer {result}")
             chat_history.append((request["msg"], result["response"]))

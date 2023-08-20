@@ -20,11 +20,23 @@ export function CodeEditor(props) {
     const [content, setQuestion] = useState(props.initialContent);
 
 
+    // Every 60 seconds let the interviewer know what you're typing.
+    useEffect(() => {
+        const timer = setInterval(() => {
+            var currentCode = editorRef.current.getValue()
+            props.sendCurrentCode(currentCode);
+        }, 60000)
+        return () => {
+            clearInterval(timer);
+        };
+    });
+
+
     useEffect(() => {
         if (editorRef.current) {
             editorRef.current.setValue(props.initialContent);
         }
-        alert(`content ${content}`)
+        //alert(`content ${content}`)
     }, [content]);
 
 
