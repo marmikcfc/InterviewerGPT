@@ -1,6 +1,8 @@
 import "./App.css";
-import AudioRecorder from "../src/AudioRecorder";
+import AudioRecorder from "./AudioRecorder";
 import { useState, useEffect, useRef } from "react";
+import { CodeEditor } from "./CodeEditor";
+import { Chat } from "./ChatWindow";
 
 const App = () => {
     const [currentMessage, setCurrentMessage] = useState("");
@@ -8,6 +10,8 @@ const App = () => {
     const [chatMessages, setChatMessages] = useState([]);
     const [waitingForStreamToEnd, setWaitingForStreamToEnd] = useState(false)
     const [interviewId, setInterviewId] = useState(Math.random())
+    const [initialContent, setInitialContent] = useState("// piedpiper phone interivew")
+
     const prevMessageRef = useRef();
 
 
@@ -49,7 +53,7 @@ const App = () => {
     }, [currentMessage]);
 
     var currMessage = ""
-
+    var prevMessages = []
     // Function to handle incoming messages from server
     const handleIncomingMessage = (message) => {
 
@@ -72,10 +76,8 @@ const App = () => {
             // Handle the end of the stream
             // Update chatMessages state if needed
 
-            let prevMessages = [...chatMessages];
             prevMessages.push(currMessage);
             setChatMessages([...prevMessages])
-
 
             setWaitingForStreamToEnd(false);
             console.log("Stream ended:", message);
@@ -134,12 +136,11 @@ const App = () => {
             </div>
             <div className="content">
                 <div className="coding-editor">
-                    <h2>Coding Editor</h2>
-                    {/* Your coding editor content here */}
+                    <CodeEditor initialContent={initialContent} />
                 </div>
                 <div className="chat-window">
                     <h2>Chat Window</h2>
-                    {/* Your chat window content here */}
+                    <Chat chatMessages={chatMessages} />
                 </div>
             </div>
 
