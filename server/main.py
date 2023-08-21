@@ -3,7 +3,7 @@ import logging
 import pickle
 from pathlib import Path
 from typing import Optional
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from fastapi.templating import Jinja2Templates
 from langchain.vectorstores import VectorStore
 from callback import StreamingLLMCallbackHandler
@@ -19,16 +19,24 @@ from prompts import get_prompts
 from questions import get_question
 from interview_types import InterviewTypes
 import json
+import websockets
+import elevenlabs
+
+
+
 
 app = FastAPI()
 #os.environ["OPENAI_API_KEY"] = ""
 logging.basicConfig(level = logging.DEBUG)
 
-
 chat_history = []
 interview_agent = InterviewAgent()
 interview_started = False
 current_section = InterviewSections.CODING_INTERVIEW_INTRO
+
+ELEVEN_LABS_API_KEY = "5bb83d503e06369aff83abb071ec0f89"  # Set this environment variable or replace with your key
+elevenlabs.set_api_key(ELEVEN_LABS_API_KEY)
+
 
 # Need to handle a case where we need to abruptly stop the interview
 def get_current_interview_section(start_time):
@@ -37,19 +45,19 @@ def get_current_interview_section(start_time):
     diff = (current_time - start_time).total_seconds() / 60
 
     # Prompt for intro 
-    if diff < 1:
+    if diff < 4:
         interview_agent.set_current_chain(InterviewSections.CODING_INTERVIEW_INTRO)
         return InterviewSections.CODING_INTERVIEW_INTRO
-    elif diff > 1 and diff < 2:
+    elif diff > 4 and diff < 8:
         interview_agent.set_current_chain(InterviewSections.CODING_INTERVIEW_QUESTION_INTRO)
         return InterviewSections.CODING_INTERVIEW_QUESTION_INTRO
-    elif diff > 2 and diff < 4:
+    elif diff > 8 and diff < 30:
         interview_agent.set_current_chain(InterviewSections.CODING_INTERVIEW)
         return InterviewSections.CODING_INTERVIEW
-    elif diff >  4 and diff < 5:
+    elif diff >  30 and diff < 55:
         interview_agent.set_current_chain(InterviewSections.CODING_INTERVIEW_CONCLUSION)
         return InterviewSections.CODING_INTERVIEW_CONCLUSION
-    elif diff > 5 and diff < 6:
+    elif diff > 35 and diff < 40:
         interview_agent.set_current_chain(InterviewSections.CODING_INTERVIEW_OUTRO)
         return InterviewSections.CODING_INTERVIEW_OUTRO
     else:
@@ -72,10 +80,14 @@ def update_chains(interview_section, stream_handler, question, code):
     interview_agent.update_chains(interview_section, interview_section_chain)
     logging.info("Updated agent")
 
+
+
+
 @app.on_event("startup")
 async def startup_event():
     logging.info("startup")
 
+# Textual websocket for text
 @app.websocket("/chat")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -170,6 +182,62 @@ async def websocket_endpoint(websocket: WebSocket):
                 type="error",
             )
             await websocket.send_json(resp.dict())
+
+async def get_eleven_labs_stream(voice_id: str):
+    try:   
+        logging.info("Connecting to eleven labs")
+        stream = await elevenlabs.stream(voice_id=voice_id, model_id='eleven_monolingual_v1')
+        logging.info("Returning stream object")
+        return stream
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error connecting to ElevenLabs: {e}")
+
+
+@app.websocket("/tts/{voice_id}")
+async def websocket_endpoint(websocket: WebSocket, voice_id: str, stream_eleven=Depends(get_eleven_labs_stream)):
+    await websocket.accept()
+    message_queue = asyncio.Queue()
+
+    async def receive_from_client():
+        try:
+            while True:
+                logging.info("!!! Received from client !!!!")
+                data = await websocket.receive_text()
+                await message_queue.put(data)
+        except Exception as e:
+            logging.error(f"Error receiving from client: {e}")
+
+    async def process_and_send():
+        try:
+            while True:
+                logging.info("!!! Received from Queue !!!!")
+                data = await message_queue.get()
+                data = json.loads(data)
+                await stream_eleven.send_text(data["msg"])
+                
+                response = await stream_eleven.receive()
+                if response["type"] == "text":
+                    await websocket.send_text(response["data"])
+                elif response["type"] == "binary":
+                    await websocket.send_bytes(response["data"])
+        except Exception as e:
+            logging.error(f"Error processing and sending: {e}")
+
+    # Use asyncio.gather to run both coroutines in parallel
+    try:
+        receiver_task = asyncio.create_task(receive_from_client())
+        sender_task = asyncio.create_task(process_and_send())
+        await asyncio.gather(receiver_task, sender_task)
+    except WebSocketDisconnect:
+        logging.error("WebSocket disconnected")
+        await stream_eleven.close()
+    except Exception as e:
+        logging.error(f"General error in WebSocket endpoint: {e}")
+        await stream_eleven.close()
+    finally:
+        await stream_eleven.close()
+        await websocket.close()
 
 
 if __name__ == "__main__":
