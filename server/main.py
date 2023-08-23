@@ -20,9 +20,13 @@ from questions import get_question
 from interview_types import InterviewTypes
 import json
 import websockets
-import elevenlabs
+from typing import Iterator, Optional, AsyncIterator
+import asyncio
+from websockets.exceptions import ConnectionClosedError
 
 
+message_queue = asyncio.Queue()
+asyncio.get_event_loop().set_debug(True)
 
 
 app = FastAPI()
@@ -33,9 +37,6 @@ chat_history = []
 interview_agent = InterviewAgent()
 interview_started = False
 current_section = InterviewSections.CODING_INTERVIEW_INTRO
-
-ELEVEN_LABS_API_KEY = "5bb83d503e06369aff83abb071ec0f89"  # Set this environment variable or replace with your key
-elevenlabs.set_api_key(ELEVEN_LABS_API_KEY)
 
 
 # Need to handle a case where we need to abruptly stop the interview
@@ -101,7 +102,6 @@ async def websocket_endpoint(websocket: WebSocket):
     sent_question_to_the_frontend = False
     interview_dict = {}
     
-    logging.info("##### ##### ##### ###### ###### ###### ####### ####### ######## ######## ")
     most_recent_code = None
     while True:
         try:
@@ -183,63 +183,119 @@ async def websocket_endpoint(websocket: WebSocket):
             )
             await websocket.send_json(resp.dict())
 
-async def get_eleven_labs_stream(voice_id: str):
-    try:   
-        logging.info("Connecting to eleven labs")
-        stream = await elevenlabs.stream(voice_id=voice_id, model_id='eleven_monolingual_v1')
-        logging.info("Returning stream object")
-        return stream
-
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error connecting to ElevenLabs: {e}")
-
-
-@app.websocket("/tts/{voice_id}")
-async def websocket_endpoint(websocket: WebSocket, voice_id: str, stream_eleven=Depends(get_eleven_labs_stream)):
+#Websocket for text to speech
+#TODO integrate with the actual stream generation from LLM to avoid two and fro from server to client
+#TODO persist websocket connection to makes sure that it can be reused
+@app.websocket("/tts")
+async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    message_queue = asyncio.Queue()
-
-    async def receive_from_client():
-        try:
-            while True:
-                logging.info("!!! Received from client !!!!")
-                data = await websocket.receive_text()
-                await message_queue.put(data)
-        except Exception as e:
-            logging.error(f"Error receiving from client: {e}")
-
-    async def process_and_send():
-        try:
-            while True:
-                logging.info("!!! Received from Queue !!!!")
-                data = await message_queue.get()
-                data = json.loads(data)
-                await stream_eleven.send_text(data["msg"])
-                
-                response = await stream_eleven.receive()
-                if response["type"] == "text":
-                    await websocket.send_text(response["data"])
-                elif response["type"] == "binary":
-                    await websocket.send_bytes(response["data"])
-        except Exception as e:
-            logging.error(f"Error processing and sending: {e}")
-
-    # Use asyncio.gather to run both coroutines in parallel
     try:
-        receiver_task = asyncio.create_task(receive_from_client())
-        sender_task = asyncio.create_task(process_and_send())
-        await asyncio.gather(receiver_task, sender_task)
-    except WebSocketDisconnect:
-        logging.error("WebSocket disconnected")
-        await stream_eleven.close()
+        print("Before generate")
+        
+        # Start message_generator in the background
+        task = asyncio.create_task(message_generator(websocket))
+        
+        async for audio_chunk in generate_stream_input(voice="IsQVxKZH6osrAZXuiOdd", model="eleven_monolingual_v1", api_key="5bb83d503e06369aff83abb071ec0f89"):
+            print("Post generate")
+            if audio_chunk == "":
+                continue
+            await websocket.send_bytes(audio_chunk)
     except Exception as e:
-        logging.error(f"General error in WebSocket endpoint: {e}")
-        await stream_eleven.close()
+        print(f"error {e}")
     finally:
-        await stream_eleven.close()
-        await websocket.close()
+        task.cancel()  # Cancel the message_generator task when done
+
+async def message_generator(websocket: WebSocket):
+    while True:
+        try:
+            print("Waiting for WebSocket message...")
+            data = await websocket.receive_text()
+            data = json.loads(data)
+            print(f"data {data}")
+            await message_queue.put(data["msg"])
+            print(f"Added message to queue: {data['msg']}")
+        except ConnectionClosedError:
+            print("WebSocket connection closed.")
+            break
+
+async def text_chunker_from_queue() -> AsyncIterator[str]:
+    """Used during input streaming to chunk text blocks and set last char to space"""
+    splitters = (".", ",", "?", "!", ";", ":", "—", "-", "(", ")", "[", "]", "}", " ")
+    buffer = ""
+    print("In text chunker from queue")
+    while True:
+        print("Waiting to get message from queue...")
+
+        text = await message_queue.get()
+        print(f"Got {text}")
+        if buffer.endswith(splitters):
+            t = buffer if buffer.endswith(" ") else buffer + " "
+            print(f"Yielding in if {t}")
+            yield t
+            buffer = text
+        elif text.startswith(splitters):
+            output = buffer + text[0]
+            t = output if output.endswith(" ") else output + " "
+            print(f"Yielding in elif {t}")
+            yield output if output.endswith(" ") else output + " "
+            buffer = text[1:]
+        else:
+            buffer += text
+            yield buffer + " "
+            buffer = ""
 
 
+async def generate_stream_input( voice, model, api_key: Optional[str] = None) -> Iterator[bytes]:
+    print("IN generate stream input")
+    BOS = {
+        "text": " ",
+        "try_trigger_generation": True,
+        "voice_settings": None,
+        "generation_config": {
+            "chunk_length_schedule": [50],
+        },
+        "xi-api-key": api_key  # Add your xi-api-key here with hyphens
+    }
+    BOS = json.dumps(BOS)
+
+    EOS = json.dumps({"text":"", "xi-api-key": api_key })
+
+    async with websockets.connect(
+        f"wss://api.elevenlabs.io/v1/text-to-speech/{voice}/stream-input?model_id={model}"
+    ) as websocket:
+        print("Concceted to websocket")
+        # Send beginning of stream
+        await websocket.send(BOS)
+        # Stream text chunks and receive audio
+        async for text_chunk in text_chunker_from_queue():
+            print(f"Got text_chuunk {text_chunk}")
+            data = dict(text=text_chunk, try_trigger_generation=True)
+            await websocket.send(json.dumps({"text":text_chunk, "try_trigger_generation":True , "xi-api-key": api_key}))
+            await websocket.send(EOS)
+            print("sent to the websocket")
+            try:
+                print("waiting to revieve websocket")
+                data = json.loads(await asyncio.wait_for(websocket.recv(), timeout=10))
+                print(data)
+                if data["audio"]:
+                    yield data["audio"] 
+            except websockets.exceptions.ConnectionClosedOK:
+                print("Connection closed ")
+                break
+            except asyncio.TimeoutError:
+                print("WebSocket response timed out!")
+                break
+
+        # Receive remaining audio
+        while True:
+            try:
+                data = await json.loads(await websocket.recv())
+                if data["audio"]:
+                    yield data["audio"]
+            except websockets.exceptions.ConnectionClosedOK:
+                print("Connection closed ")
+                break
+                
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=9000)
